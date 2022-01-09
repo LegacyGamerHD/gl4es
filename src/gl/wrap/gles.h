@@ -6744,7 +6744,6 @@ typedef void (APIENTRY_GLES * glVertexAttribIPointer_PTR)(glVertexAttribIPointer
     packed_data->args.a5 = (GLvoid *)pointer; \
     glPushCall((void *)packed_data); \
 }
-#endif
 #endif // USE_EXPERIMENTAL_FEATURE
 #ifndef direct_glVertexPointer
 #define push_glVertexPointer(size, type, stride, pointer) { \
