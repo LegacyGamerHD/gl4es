@@ -2,7 +2,7 @@
 #define _GL4ES_ATTRIBUTES_H_
 
 #ifndef EXPORT
- #if defined(__EMSCRIPTEN__) || defined(__APPLE__)
+ #if defined(__EMSCRIPTEN__) // || defined(__APPLE__)
    #define EXPORT
  #elif defined(STATICLIB)
    #define EXPORT
@@ -53,7 +53,7 @@
 #endif
 
 #ifndef AliasDecl
- #ifdef __GNUC__
+ #if defined(__GNUC__) && !defined(__APPLE__)
   #define AliasDecl(RET,NAME,DEF,OLD) \
    RET APIENTRY_GL4ES NAME DEF __attribute__((alias(_STM(OLD,DEF))))
  #elif defined(_MSC_VER)

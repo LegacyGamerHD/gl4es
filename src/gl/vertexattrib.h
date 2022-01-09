@@ -9,6 +9,7 @@ void APIENTRY_GL4ES gl4es_glVertexAttribPointer(GLuint index, GLint size, GLenum
 #ifdef USE_EXPERIMENTAL_FEATURE
 void APIENTRY_GL4ES gl4es_glVertexAttribIPointer(GLuint index, GLint size, GLenum type, GLsizei stride, const GLvoid * pointer);
 #endif
+
 void APIENTRY_GL4ES gl4es_glEnableVertexAttribArray(GLuint index);
 void APIENTRY_GL4ES gl4es_glDisableVertexAttribArray(GLuint index);
 

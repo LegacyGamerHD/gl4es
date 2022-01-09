@@ -33,6 +33,10 @@ void __stdcall GetSystemTimeAsFileTime(unsigned __int64*);
 #define DBG(a)
 #endif
 
+#ifdef __APPLE__
+# define glCallList gl4es_glCallList
+#endif
+
 int adjust_vertices(GLenum mode, int nb) {
     switch (mode) {
         case GL_POINTS:

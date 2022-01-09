@@ -34,6 +34,16 @@ void gl4es_Stub(void *x, ...) {
 void APIENTRY_GL4ES gl4es_Stub(void *x) {}
 #endif
 
+#ifdef __APPLE__
+void gl4es_glEnableClientStatei(GLenum array, GLuint index) {
+    gl4es_glEnableClientStateIndexed(array, index);
+}
+void gl4es_glDisableClientStatei(GLenum array, GLuint index) {
+    gl4es_glDisableClientStateIndexed(array, index);
+}
+#endif
+
+__attribute__((visibility("default")))
 void* APIENTRY_GL4ES gl4es_GetProcAddress(const char *name) {
     DBG(printf("glGetProcAddress(\"%s\")", name);)
     // generated gles wrappers
@@ -934,6 +944,8 @@ void* APIENTRY_GL4ES gl4es_GetProcAddress(const char *name) {
     _EXT(glVertexAttrib4f);
     _EXT(glVertexAttrib4fv);
     _EXT(glVertexAttribPointer);
+    _EXT(glVertexAttribIPointer);
+    _EX(glVertexAttribIPointer);
     _EXT(glVertexPointer);
     _EXT(glProgramUniform1f);
     _EXT(glProgramUniform2f);

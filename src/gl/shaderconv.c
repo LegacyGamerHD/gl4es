@@ -285,8 +285,8 @@ static const char* gl_TexMatrixSources[] = {
 static const char* GLESHeader[] = {
   "#version 100\n%sprecision %s float;\nprecision %s int;\n",
   "#version 120\n%sprecision %s float;\nprecision %s int;\n",
-  "#version 310 es\n#define attribute in\n#define varying out\n%sprecision %s float;\nprecision %s int;\n",
-  "#version 300 es\n#define attribute in\n#define varying out\n%sprecision %s float;\nprecision %s int;\n"
+  "#version 310 es\n%sprecision %s float;\nprecision %s int;\n",
+  "#version 300 es\n%sprecision %s float;\nprecision %s int;\n"
 };
 
 static const char* gl4es_transpose =
@@ -492,12 +492,13 @@ static char* ConvertShader_gl4es(const char* pEntry, int isVertex, shaderconv_ne
   int wanthighp = !fpeShader;
   if(wanthighp && !hardext.highp) wanthighp = 0;
   int versionHeader = 0;
-  #if 0
+
+  #if 1
   // support for higher glsl require much more work
   // around some keyword
   // like in/out that depend on the shader beeing vertex or fragment
   // and a few other little things...
-  if(versionString && strcmp(versionString, "120")==0)
+  if(versionString && (strcmp(versionString, "120")==0 || strcmp(versionString, "150")==0))
      version120 = 1;
   if(version120) {
     if(hardext.glsl120) versionHeader = 1;
@@ -708,7 +709,13 @@ static char* ConvertShader_gl4es(const char* pEntry, int isVertex, shaderconv_ne
       // check for builtin OpenGL attributes...
       int n = sizeof(builtin_attrib)/sizeof(builtin_attrib_t);
       for (int i=0; i<n; i++) {
-          if(strstr(Tmp, builtin_attrib[i].glname)) {
+          char *Part_Tmp;
+          if((Part_Tmp = strstr(Tmp, builtin_attrib[i].glname))) {
+              if (!strcmp(builtin_attrib[i].glname, "gl_Vertex") && !strncmp(Part_Tmp, "gl_VertexID", 11)) {
+                  // attempt to recognize gl_VertexID as gl_Vertex?
+                  continue;
+              }
+              
               // ok, this attribute is used
               // replace gl_name by _gl4es_ one
               Tmp = InplaceReplace(Tmp, &tmpsize, builtin_attrib[i].glname, builtin_attrib[i].name);
@@ -1237,6 +1244,11 @@ static char* ConvertShader_gl4es(const char* pEntry, int isVertex, shaderconv_ne
     Tmp = InplaceReplace(Tmp, &tmpsize, "mat3x3", "mat3");
   }
   
+  if (versionHeader > 1) {
+    const char* GLESBackport = "#define texture2D texture\n#define attribute in\n#define varying out\n";
+    Tmp = InplaceInsert(GetLine(Tmp, 1), GLESBackport, Tmp, &tmpsize);
+  }
+
   // finish
   if((globals4es.dbgshaderconv&maskafter)==maskafter) {
     printf("New Shader source:\n%s\n", Tmp);
