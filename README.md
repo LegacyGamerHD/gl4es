@@ -12,7 +12,7 @@ GL4ES is known to work on many platform: OpenPandora, ODroid, RaspberryPI (2 and
 
 This library is based on glshim (https://github.com/lunixbochs/glshim) but as now evolved far from it, with different feature set and objectives. Go check this lib if you need things like RemoteGL or TinyGLES (for software rendering).
 
-The focus is on compatibility and speed with a wide selection of game and software.
+The focus is on compatibility and speed with a wide selection of game and software. 
 
 It has been tested successfully of a large selection of games and software, including: Minecraft, OpenMW, SeriousSam (both First and Second Encounters), RVGL (ReVolt GL), TSMC (The Secret Maryo Chronicles), TORCS, SpeedDreams, GL-117, Foobillard(plus), half life 1&2, Blender 2.68 to name just a few. I have also some success with Linux port of XNA games, using either MonoGame or FNA.
 
