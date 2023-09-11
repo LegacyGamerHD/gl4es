@@ -15,9 +15,4 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: gl4es-112-android
-          path: /*
-      - name: Upload GL4ES debug libs
-        uses: actions/upload-artifact@v2
-        with:
-          name: gl4es-112-android
-          path: 'obj/**/*.so'
+          path: ./
