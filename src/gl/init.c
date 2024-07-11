@@ -255,7 +255,7 @@ void initialize_gl4es() {
       default:
         // automatic GL version selection
         globals4es.gl = 31;
-	SHUT_LOGD("Using GLES %s backend\n", "1.1");
+	SHUT_LOGD("Using GLES %s backend\n", "3.2");
         break;
     }
 
