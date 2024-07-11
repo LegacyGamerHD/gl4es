@@ -167,7 +167,7 @@ void initialize_gl4es() {
       env(LIBGL_FBONOALPHA, globals4es.fbo_noalpha, "Main FBO has no alpha channel");
     }
 
-		globals4es.es=ReturnEnvVarInt("LIBGL_ES");
+    globals4es.es=ReturnEnvVarInt("LIBGL_ES");
     switch(globals4es.es) {
       case 1:
       case 2:
@@ -181,31 +181,83 @@ void initialize_gl4es() {
     globals4es.gl=ReturnEnvVarInt("LIBGL_GL");
     switch(globals4es.gl) {
       case 10:
+	globals4es.gl = 10;
+	SHUT_LOGD("Using GLES %s backend\n", "1.1");
+	break;
       case 11:
+	globals4es.gl = 11;
+	SHUT_LOGD("Using GLES %s backend\n", "1.2");
+	break;
       case 12:
+	globals4es.gl = 12;
+	SHUT_LOGD("Using GLES %s backend\n", "1.3");
+	break;
       case 13:
+	globals4es.gl = 13;
+	SHUT_LOGD("Using GLES %s backend\n", "1.4");
+	break;
       case 14:
+	globals4es.gl = 14;
+	SHUT_LOGD("Using GLES %s backend\n", "1.5");
+	break;
       case 15:
+	globals4es.gl = 15;
+	SHUT_LOGD("Using GLES %s backend\n", "1.6");
+	break;
       case 20:
+	globals4es.gl = 20;
+	SHUT_LOGD("Using GLES %s backend\n", "2.1");
+	break;
       case 21:
+	globals4es.gl = 21;
+	SHUT_LOGD("Using GLES %s backend\n", "2.2");
+	break;
       case 30:
+	globals4es.gl = 30;
+	SHUT_LOGD("Using GLES %s backend\n", "3.1");
+	break;
       case 31:
+	globals4es.gl = 31;
+	SHUT_LOGD("Using GLES %s backend\n", "3.2");
+	break;
       case 32:
+	globals4es.gl = 32;
+	SHUT_LOGD("Using GLES %s backend\n", "3.2");
+	break;
       case 33:
+	globals4es.gl = 33;
+	SHUT_LOGD("Using GLES %s backend\n", "3.4");
+	break;
       case 40:
+	globals4es.gl = 40;
+	SHUT_LOGD("Using GLES %s backend\n", "4.1");
+	break;
       case 41:
+	globals4es.gl = 41;
+	SHUT_LOGD("Using GLES %s backend\n", "4.2");
+	break;
       case 42:
+	globals4es.gl = 42;
+	SHUT_LOGD("Using GLES %s backend\n", "4.3");
+	break;
       case 43:
+	globals4es.gl = 43;
+	SHUT_LOGD("Using GLES %s backend\n", "4.4");
+	break;
       case 44:
+	globals4es.gl = 44;
+	SHUT_LOGD("Using GLES %s backend\n", "4.5");
+	break;
       case 45:
-        break;
+	globals4es.gl = 45;
+	SHUT_LOGD("Using GLES %s backend\n", "4.6");
+	break;
       default:
         // automatic GL version selection
-        globals4es.gl = (globals4es.es==1)?15:33;  // forcing GL 1.5 for es1.1 and GL 2.1 for es2.0
+        globals4es.gl = 31;
+	SHUT_LOGD("Using GLES %s backend\n", "1.1");
         break;
     }
-
-    SHUT_LOGD("Using GLES %s backend\n", (globals4es.es==1)?"1.1":"3.2");
 
     env(LIBGL_NODEPTHTEX, globals4es.nodepthtex, "Disable usage of Depth Textures");
 
