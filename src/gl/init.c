@@ -1,8 +1,8 @@
 #include <stdio.h>
+#include <stdlib.h>
 #ifndef _WIN32
 #include <unistd.h>
 #else
-#include <stdio.h>
 #include <direct.h>
 #define getcwd(a,b) _getcwd(a,b)
 #define snprintf _snprintf
@@ -179,8 +179,9 @@ void initialize_gl4es() {
     }
 
     const char *libglgl = getenv("LIBGL_GL");
+    int libglgl_int = libglgl ? atoi(libglgl) : 10;
     // globals4es.gl=ReturnEnvVarInt("LIBGL_GL");
-    switch(libglgl) {
+    switch(libglgl_int) {
       case 10:
 	globals4es.gl = 10;
 	SHUT_LOGD("Using GLES %s backend\n", "1.1");
