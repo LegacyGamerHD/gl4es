@@ -178,8 +178,9 @@ void initialize_gl4es() {
         break;
     }
 
-    globals4es.gl=ReturnEnvVarInt("LIBGL_GL");
-    switch(globals4es.gl) {
+    const char *libglgl = getenv("LIBGL_GL");
+    // globals4es.gl=ReturnEnvVarInt("LIBGL_GL");
+    switch(libglgl) {
       case 10:
 	globals4es.gl = 10;
 	SHUT_LOGD("Using GLES %s backend\n", "1.1");
