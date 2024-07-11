@@ -179,7 +179,7 @@ void initialize_gl4es() {
     }
 
     const char *libglgl = getenv("LIBGL_GL");
-    int libglgl_int = libglgl ? atoi(libglgl) : 10;
+    int libglgl_int = libglgl ? atoi(libglgl) : 21;
     // globals4es.gl=ReturnEnvVarInt("LIBGL_GL");
     switch(libglgl_int) {
       case 10:
