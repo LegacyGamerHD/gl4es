@@ -1,3 +1,4 @@
+#include "host.h"
 #include "buffers.h"
 
 #include "khash.h"
@@ -88,8 +89,8 @@ void rebind_real_buff_arrays(int old_buffer, int new_buffer) {
     for (int j = 0; j < hardext.maxvattrib; j++) {
         if (glstate->vao->vertexattrib[j].real_buffer == old_buffer) {
             glstate->vao->vertexattrib[j].real_buffer = new_buffer;
-            if(!new_buffer)
-                glstate->vao->vertexattrib[j].real_pointer = 0;
+            /*if(!new_buffer)
+                glstate->vao->vertexattrib[j].real_pointer = 0;*/
         }
     }
 }
@@ -137,6 +138,7 @@ void APIENTRY_GL4ES gl4es_glBindBuffer(GLenum target, GLuint buffer) {
     // if buffer = 0 => unbind buffer!
     if (buffer == 0) {
         // unbind buffer
+        bindBuffer(target, 0);
         unbind_buffer(target);
     } else {
         // search for an existing buffer
@@ -184,20 +186,20 @@ void APIENTRY_GL4ES gl4es_glBufferData(GLenum target, GLsizeiptr size, const GLv
     
     if(buff->real_buffer && !go_real) {
         rebind_real_buff_arrays(buff->real_buffer, 0);
-        LOAD_GLES(glDeleteBuffers);
-        gles_glDeleteBuffers(1, &buff->real_buffer);
+        
+        deleteSingleBuffer(buff->real_buffer);
         // what about VA already pointing there?
         buff->real_buffer = 0;
     }
     if(go_real) {
         if(!buff->real_buffer) {
-            LOAD_GLES(glGenBuffers);
-            gles_glGenBuffers(1, &buff->real_buffer);
+            
+            host_functions.glGenBuffers(1, &buff->real_buffer);
         }
-        LOAD_GLES(glBufferData);
-        LOAD_GLES(glBindBuffer);
+        
+        
         bindBuffer(target, buff->real_buffer);
-        gles_glBufferData(target, size, data, usage);
+        host_functions.glBufferData(target, size, data, usage);
         DBG(printf(" => real VBO %d\n", buff->real_buffer);)
     }
         
@@ -218,7 +220,7 @@ void APIENTRY_GL4ES gl4es_glBufferData(GLenum target, GLsizeiptr size, const GLv
         vertexattrib_t *v = &glstate->vao->vertexattrib[i];
         if( v->buffer == buff ) {
 		    v->real_buffer = v->buffer->real_buffer;
-            v->real_pointer = buff->data;
+            // do not update real_pointer, as it's the relative start in the buffer
         }
     }
     noerrorShim();
@@ -242,20 +244,19 @@ void APIENTRY_GL4ES gl4es_glNamedBufferData(GLuint buffer, GLsizeiptr size, cons
         go_real = 1;
     
     if(buff->real_buffer && !go_real) {
-        LOAD_GLES(glDeleteBuffers);
-        gles_glDeleteBuffers(1, &buff->real_buffer);
+        deleteSingleBuffer(buff->real_buffer);
         // what about VA already pointing there?
         buff->real_buffer = 0;
     }
     if(go_real) {
         if(!buff->real_buffer) {
-            LOAD_GLES(glGenBuffers);
-            gles_glGenBuffers(1, &buff->real_buffer);
+            
+            host_functions.glGenBuffers(1, &buff->real_buffer);
         }
-        LOAD_GLES(glBufferData);
-        LOAD_GLES(glBindBuffer);
+        
+        
         bindBuffer(buff->type, buff->real_buffer);
-        gles_glBufferData(buff->type, size, data, usage);
+        host_functions.glBufferData(buff->type, size, data, usage);
     }
 
     buff->size = size;
@@ -269,7 +270,7 @@ void APIENTRY_GL4ES gl4es_glNamedBufferData(GLuint buffer, GLsizeiptr size, cons
         vertexattrib_t *v = &glstate->vao->vertexattrib[i];
         if( v->buffer == buff ) {
 		    v->real_buffer = v->buffer->real_buffer;
-            v->real_pointer = buff->data;
+            // do not update real_pointer, as it's the relative start in the buffer
         }
     }
     noerrorShim();
@@ -297,10 +298,10 @@ void APIENTRY_GL4ES gl4es_glBufferSubData(GLenum target, GLintptr offset, GLsize
     }
 
     if((target==GL_ARRAY_BUFFER || target==GL_ELEMENT_ARRAY_BUFFER) && buff->real_buffer) {
-        LOAD_GLES(glBufferSubData);
-        LOAD_GLES(glBindBuffer);
+        
+        
         bindBuffer(target, buff->real_buffer);
-        gles_glBufferSubData(target, offset, size, data);
+        host_functions.glBufferSubData(target, offset, size, data);
     }
         
     memcpy((char*)buff->data + offset, data, size);
@@ -320,10 +321,10 @@ void APIENTRY_GL4ES gl4es_glNamedBufferSubData(GLuint buffer, GLintptr offset, G
     }
         
     if((buff->type==GL_ARRAY_BUFFER || buff->type==GL_ELEMENT_ARRAY_BUFFER) && buff->real_buffer) {
-        LOAD_GLES(glBufferSubData);
-        LOAD_GLES(glBindBuffer);
+        
+        
         bindBuffer(buff->type, buff->real_buffer);
-        gles_glBufferSubData(buff->type, offset, size, data);
+        host_functions.glBufferSubData(buff->type, offset, size, data);
     }
     memcpy((char*)buff->data + offset, data, size);
     noerrorShim();
@@ -348,8 +349,8 @@ void APIENTRY_GL4ES gl4es_glDeleteBuffers(GLsizei n, const GLuint * buffers) {
                     buff = kh_value(list, k);
                     if(buff->real_buffer) {
                         rebind_real_buff_arrays(buff->real_buffer, 0);  // unbind
-                        LOAD_GLES(glDeleteBuffers);
-                        gles_glDeleteBuffers(1, &buff->real_buffer);
+                        
+                        deleteSingleBuffer(buff->real_buffer);
                     }
                     if (glstate->vao->vertex == buff)
                         glstate->vao->vertex = NULL;
@@ -470,7 +471,7 @@ void* APIENTRY_GL4ES gl4es_glMapBuffer(GLenum target, GLenum access) {
 	noerrorShim();
 	return buff->data;		// Not nice, should do some copy or something probably
 }
-void* APIENTRY_GLES gl4es_glMapNamedBuffer(GLuint buffer, GLenum access) {
+void* APIENTRY_GL4ES gl4es_glMapNamedBuffer(GLuint buffer, GLenum access) {
     DBG(printf("glMapNamedBuffer(%u, %s)\n", buffer, PrintEnum(access));)
 
 	glbuffer_t *buff = getbuffer_id(buffer);
@@ -509,15 +510,15 @@ GLboolean APIENTRY_GL4ES gl4es_glUnmapBuffer(GLenum target) {
     }
 	noerrorShim();
     if(buff->real_buffer && (buff->type==GL_ARRAY_BUFFER || buff->type==GL_ELEMENT_ARRAY_BUFFER) && buff->mapped && !buff->ranged && (buff->access==GL_WRITE_ONLY || buff->access==GL_READ_WRITE)) {
-        LOAD_GLES(glBufferSubData);
-        LOAD_GLES(glBindBuffer);
+        
+        
         bindBuffer(buff->type, buff->real_buffer);
-        gles_glBufferSubData(buff->type, 0, buff->size, buff->data);
+        host_functions.glBufferSubData(buff->type, 0, buff->size, buff->data);
     }
     if(buff->real_buffer && (buff->type==GL_ARRAY_BUFFER || buff->type==GL_ELEMENT_ARRAY_BUFFER) && buff->mapped && buff->ranged && (buff->access&GL_MAP_WRITE_BIT_EXT) && !(buff->access&GL_MAP_FLUSH_EXPLICIT_BIT_EXT)) {
-        LOAD_GLES(glBufferSubData);
+        
         bindBuffer(buff->type, buff->real_buffer);
-        gles_glBufferSubData(buff->type, buff->offset, buff->length, (void*)((uintptr_t)buff->data+buff->offset));
+        host_functions.glBufferSubData(buff->type, buff->offset, buff->length, (void*)((uintptr_t)buff->data+buff->offset));
     }
     if (buff->mapped) {
 		buff->mapped = 0;
@@ -536,16 +537,16 @@ GLboolean APIENTRY_GL4ES gl4es_glUnmapNamedBuffer(GLuint buffer) {
 		return GL_FALSE;		// Should generate an error!
 	noerrorShim();
     if(buff->real_buffer && (buff->type==GL_ARRAY_BUFFER || buff->type==GL_ELEMENT_ARRAY_BUFFER) && buff->mapped && (buff->access==GL_WRITE_ONLY || buff->access==GL_READ_WRITE)) {
-        LOAD_GLES(glBufferSubData);
-        LOAD_GLES(glBindBuffer);
+        
+        
         bindBuffer(buff->type, buff->real_buffer);
-        gles_glBufferSubData(buff->type, 0, buff->size, buff->data);
+        host_functions.glBufferSubData(buff->type, 0, buff->size, buff->data);
     }
     if(buff->real_buffer && (buff->type==GL_ARRAY_BUFFER || buff->type==GL_ELEMENT_ARRAY_BUFFER) && buff->mapped && buff->ranged && (buff->access&GL_MAP_WRITE_BIT_EXT) && !(buff->access&GL_MAP_FLUSH_EXPLICIT_BIT_EXT)) {
-        LOAD_GLES(glBufferSubData);
-        LOAD_GLES(glBindBuffer);
+        
+        
         bindBuffer(buff->type, buff->real_buffer);
-        gles_glBufferSubData(buff->type, buff->offset, buff->length, (void*)((uintptr_t)buff->data+buff->offset));
+        host_functions.glBufferSubData(buff->type, buff->offset, buff->length, (void*)((uintptr_t)buff->data+buff->offset));
     }
 	if (buff->mapped) {
 		buff->mapped = 0;
@@ -664,9 +665,9 @@ void APIENTRY_GL4ES gl4es_glFlushMappedBufferRange(GLenum target, GLintptr offse
     }
 
     if(buff->real_buffer && (buff->type==GL_ARRAY_BUFFER || buff->type==GL_ELEMENT_ARRAY_BUFFER) && (buff->access&GL_MAP_WRITE_BIT_EXT)) {
-        LOAD_GLES(glBufferSubData);
+        
         bindBuffer(buff->type, buff->real_buffer);
-        gles_glBufferSubData(buff->type, buff->offset+offset, length, (void*)((uintptr_t)buff->data+buff->offset+offset));
+        host_functions.glBufferSubData(buff->type, buff->offset+offset, length, (void*)((uintptr_t)buff->data+buff->offset+offset));
     }
 }
 
@@ -687,22 +688,22 @@ void APIENTRY_GL4ES gl4es_glCopyBufferSubData(GLenum readTarget, GLenum writeTar
     // TODO: check memory overlap and overread/overwrite
     memcpy((char*)writebuff->data+writeOffset, (char*)readbuff->data+readOffset, size);
     if(writebuff->real_buffer && (writebuff->type==GL_ARRAY_BUFFER || writebuff->type==GL_ELEMENT_ARRAY_BUFFER) && writebuff->mapped && (writebuff->access==GL_WRITE_ONLY || writebuff->access==GL_READ_WRITE)) {
-        LOAD_GLES(glBufferSubData);
+        
         bindBuffer(writebuff->type, writebuff->real_buffer);
-        gles_glBufferSubData(writebuff->type, writeOffset, size, (char*)writebuff->data+writeOffset);
+        host_functions.glBufferSubData(writebuff->type, writeOffset, size, (char*)writebuff->data+writeOffset);
     }
     noerrorShim();
 }
 
 void bindBuffer(GLenum target, GLuint buffer)
 {
-    LOAD_GLES(glBindBuffer);
+    
     if(target==GL_ARRAY_BUFFER) {
         if(glstate->bind_buffer.array == buffer)
             return;
         DBG(printf("Bind buffer %d to GL_ARRAY_BUFFER\n", buffer);)
         glstate->bind_buffer.array = buffer;
-        gles_glBindBuffer(target, buffer);
+        host_functions.glBindBuffer(target, buffer);
         
     } else if (target==GL_ELEMENT_ARRAY_BUFFER) {
         glstate->bind_buffer.want_index = buffer;
@@ -710,7 +711,7 @@ void bindBuffer(GLenum target, GLuint buffer)
             return;
         glstate->bind_buffer.index = buffer;
         DBG(printf("Bind buffer %d to GL_ELEMENT_ARRAY_BUFFER\n", buffer);)
-        gles_glBindBuffer(target, buffer);
+        host_functions.glBindBuffer(target, buffer);
     } else {
         LOGE("Warning, unhandled Buffer type %s in bindBuffer\n", PrintEnum(target));
         return;
@@ -727,29 +728,37 @@ GLuint wantBufferIndex(GLuint buffer)
 
 void realize_bufferIndex()
 {
-    LOAD_GLES(glBindBuffer);
+    
     if(glstate->bind_buffer.index != glstate->bind_buffer.want_index) {
         glstate->bind_buffer.index = glstate->bind_buffer.want_index;
-        gles_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, glstate->bind_buffer.index);
+        host_functions.glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, glstate->bind_buffer.index);
         DBG(printf("Bind buffer %d to GL_ELEMENT_ARRAY_BUFFER\n", glstate->bind_buffer.index);)
         glstate->bind_buffer.used = (glstate->bind_buffer.index && glstate->bind_buffer.array)?1:0;
     }
+}
+
+void deleteSingleBuffer(GLuint buffer) {
+   
+   if(glstate->bind_buffer.index == buffer) glstate->bind_buffer.index = 0;
+   else if(glstate->bind_buffer.want_index == buffer) glstate->bind_buffer.want_index = 0;
+   else if(glstate->bind_buffer.array == buffer) glstate->bind_buffer.array = 0;
+   host_functions.glDeleteBuffers(1, &buffer);
 }
 
 void unboundBuffers()
 {
     if(!glstate->bind_buffer.used)
         return;
-    LOAD_GLES(glBindBuffer);
+    
     if(glstate->bind_buffer.array) {
         glstate->bind_buffer.array = 0;
-        gles_glBindBuffer(GL_ARRAY_BUFFER, 0);
+        host_functions.glBindBuffer(GL_ARRAY_BUFFER, 0);
         DBG(printf("Bind buffer %d to GL_ARRAY_BUFFER\n", 0);)
     }
     if(glstate->bind_buffer.index) {
         glstate->bind_buffer.index = 0;
         glstate->bind_buffer.want_index = 0;
-        gles_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+        host_functions.glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
         DBG(printf("Bind buffer %d to GL_ELEMENT_ARRAY_BUFFER\n", 0);)
     }
     glstate->bind_buffer.used = 0;

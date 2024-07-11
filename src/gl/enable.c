@@ -1,3 +1,4 @@
+#include "host.h"
 #include "gl4es.h"
 #include "glstate.h"
 #include "init.h"
@@ -108,7 +109,7 @@ static void proxy_glEnable(GLenum cap, bool enable, void (APIENTRY_GLES *next)(G
         GO(GL_AUTO_NORMAL, auto_normal);
         proxy_GOFPE(GL_ALPHA_TEST, alpha_test,glstate->fpe_state->alphatest=enable);
         proxy_GOFPE(GL_FOG, fog, glstate->fpe_state->fog=enable);
-        proxy_GO(GL_BLEND, blend);
+        case GL_BLEND: if(glstate->enable.blend != enable) {FLUSH_BEGINEND; glstate->enable.blend = enable; if(glstate->fpe_state && globals4es.shaderblend) { glstate->fpe_state->blend_enable = enable; } else next(cap);} break;
         proxy_GO(GL_CULL_FACE, cull_face);
         proxy_GO(GL_DEPTH_TEST, depth_test);
         proxy_GO(GL_STENCIL_TEST, stencil_test);
@@ -282,8 +283,8 @@ void APIENTRY_GL4ES gl4es_glEnable(GLenum cap) {
             cap = GL_TEXTURE_STREAM_IMG;
 	}
 #endif
-    LOAD_GLES(glEnable);
-    proxy_glEnable(cap, true, gles_glEnable);
+    
+    proxy_glEnable(cap, true, host_functions.glEnable);
 }
 AliasExport(void,glEnable,,(GLenum cap));
 
@@ -303,8 +304,8 @@ void APIENTRY_GL4ES gl4es_glDisable(GLenum cap) {
             cap = GL_TEXTURE_STREAM_IMG;
 	}
 #endif
-    LOAD_GLES(glDisable);
-    proxy_glEnable(cap, false, gles_glDisable);
+    
+    proxy_glEnable(cap, false, host_functions.glDisable);
 }
 AliasExport(void,glDisable,,(GLenum cap));
 
@@ -341,7 +342,7 @@ GLboolean APIENTRY_GL4ES gl4es_glIsEnabled(GLenum cap) {
     // should flush for now... but no need if it's just a pending list...
     if (glstate->list.active && !glstate->list.pending)
         gl4es_flush();
-    LOAD_GLES(glIsEnabled);
+    
     noerrorShim();
     switch (cap) {
         isenabled(GL_AUTO_NORMAL, auto_normal);
@@ -418,7 +419,7 @@ GLboolean APIENTRY_GL4ES gl4es_glIsEnabled(GLenum cap) {
         isenabled(GL_VERTEX_PROGRAM_TWO_SIDE_ARB, vertex_two_side_arb);
         default:
 			errorGL();
-            return gles_glIsEnabled(cap);
+            return host_functions.glIsEnabled(cap);
     }
 }
 #undef isenabled
