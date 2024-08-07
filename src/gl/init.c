@@ -179,7 +179,7 @@ void initialize_gl4es() {
     }
 
     const char *libglgl = getenv("LIBGL_GL");
-    int libglgl_int = libglgl ? atoi(libglgl) : 31;
+    int libglgl_int = libglgl ? atoi(libglgl) : 33;
     // globals4es.gl=ReturnEnvVarInt("LIBGL_GL");
     switch(libglgl_int) {
       case 10:
@@ -256,7 +256,7 @@ void initialize_gl4es() {
 	break;
       default:
         // automatic GL version selection
-        globals4es.gl = 31;
+        globals4es.gl = 33;
 	SHUT_LOGD("Using GLES %s backend\n", "3.2");
         break;
     }
