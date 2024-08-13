@@ -227,7 +227,7 @@ void APIENTRY_GL4ES gl4es_glShaderSource(GLuint shader, GLsizei count, const GLc
             
             // some needed exts
             const char* GL_EXT_blend_func_extended = "#extension GL_EXT_blend_func_extended : enable\n";
-            glshader->converted = gl4es_inplace_insert(gl4es_getline(glshader->converted, 1), GL_EXT_blend_func_extended, glshader->converted, &convertedLen);
+            glshader->converted = gl4es_inplace_replace(gl4es_getline(glshader->converted, 1), GL_EXT_blend_func_extended, glshader->converted, &convertedLen);
         } else {
 
         // adapt shader if needed (i.e. not an es2 context and shader is not #version 100)
