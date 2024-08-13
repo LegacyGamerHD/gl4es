@@ -222,7 +222,7 @@ void APIENTRY_GL4ES gl4es_glShaderSource(GLuint shader, GLsizei count, const GLc
             
             // patch OptiFine 1.17.x
             if (gl4es_find_string(glshader->converted, "\nuniform mat4 textureMatrix = mat4(1.0);")) {
-                gl4es_Inplace_Replace(glshader->converted, &convertedLen, "\nuniform mat4 textureMatrix = mat4(1.0);", "\n#define textureMatrix mat4(1.0)");
+                gl4es_inplace_replace(glshader->converted, &convertedLen, "\nuniform mat4 textureMatrix = mat4(1.0);", "\n#define textureMatrix mat4(1.0)");
             }
             
             // some needed exts
