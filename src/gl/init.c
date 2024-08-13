@@ -171,6 +171,7 @@ void initialize_gl4es() {
     switch(globals4es.es) {
       case 1:
       case 2:
+      case 3:
         break;
       default:
         // automatic ES backend selection
@@ -258,6 +259,20 @@ void initialize_gl4es() {
         // automatic GL version selection
         globals4es.gl = 33;
 	SHUT_LOGD("Using GLES %s backend\n", "3.2");
+        break;
+    }
+
+    SHUT_LOGD("Using GLES %s backend\n", (globals4es.es==1)?"1.1":"2.0");
+    switch(globals4es.noshaderconv = ReturnEnvVarInt("LIBGL_NOSHADERCONV")) {
+      default:
+      case 0:
+        SHUT_LOGD("Shaderconv enabled\n");
+        break;
+      case 1:
+        SHUT_LOGD("Shaderconv disabled, only changing #version 100->110 -> 120, 130->150 -> 330\n");
+        break;
+      case 2:
+        SHUT_LOGD("Shaderconv disabled, keep the original source\n");
         break;
     }
 

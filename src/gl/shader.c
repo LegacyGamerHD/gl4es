@@ -8,6 +8,7 @@
 #include "glstate.h"
 #include "loader.h"
 #include "shaderconv.h"
+#include "string_utils.h"
 
 //#define DEBUG
 #ifdef DEBUG
@@ -17,6 +18,18 @@
 #endif
 
 KHASH_MAP_IMPL_INT(shaderlist, shader_t *);
+
+void APIENTRY_GL4ES gl4es_glBindFragDataLocation(GLuint program, GLuint colorNumber, const char * name) {
+    DBG(printf("glBindFragDataLocation(%d, %d, %s)\n", program, colorNumber, name);)
+    LOAD_GLES2(glBindFragDataLocationEXT);
+
+    if(gles_glBindFragDataLocationEXT) {
+        gles_glBindFragDataLocationEXT(program, colorNumber, name);
+        errorGL();
+    } else {
+        noerrorShim();
+    }
+}
 
 GLuint APIENTRY_GL4ES gl4es_glCreateShader(GLenum shaderType) {
     DBG(printf("glCreateShader(%s)\n", PrintEnum(shaderType));)
@@ -147,6 +160,12 @@ void APIENTRY_GL4ES gl4es_glCompileShader(GLuint shader) {
 
 void APIENTRY_GL4ES gl4es_glShaderSource(GLuint shader, GLsizei count, const GLchar * const *string, const GLint *length) {
     DBG(printf("glShaderSource(%d, %d, %p, %p)\n", shader, count, string, length);)
+    if(globals4es.noshaderconv==2){ // send source directly to GLES hardware
+        LOAD_GLES2(glShaderSource);
+        gles_glShaderSource(shader, count, string, length);
+        errorGL();
+        return;
+    }
     // sanity check
     if(count<=0) {
         errorShim(GL_INVALID_VALUE);
@@ -170,13 +189,53 @@ void APIENTRY_GL4ES gl4es_glShaderSource(GLuint shader, GLsizei count, const GLc
         for (int i=0; i<count; i++)
             strcat(glshader->source, string[i]);
     }
-    
-    if (host_functions.glShaderSource) {
+    LOAD_GLES2(glShaderSource);
+    if (gles_glShaderSource) {
+        if (globals4es.noshaderconv==1) {
+            char *source2 = strchr(glshader->source, '#');
+            if (!source2) {
+                source2 = glshader->source;
+            }
+            // are there #version?
+            if (!strncmp(source2, "#version ", 9)) {
+                glshader->converted = strdup(source2);
+                if (glshader->converted[9] == '1') {
+                    if (glshader->converted[10] - '0' < 2) {
+                        // 100, 110 -> 120
+                        glshader->converted[10] = '2';
+                    } else if (glshader->converted[10] - '0' < 6) {
+                        // 130, 140, 150 -> 330
+                        glshader->converted[9] = glshader->converted[10] = '3';
+                    }
+                }
+                // remove "core", is it safe?
+                if (!strncmp(&glshader->converted[13], "core", 4)) {
+                    strncpy(&glshader->converted[13], "\n//c", 4);
+                }
+            } else {
+                glshader->converted = calloc(1, strlen(glshader->source) + 13);
+                strcpy(glshader->converted, "#version 120\n");
+                strcpy(&glshader->converted[13], strdup(glshader->source));
+            }
+            
+            int convertedLen = strlen(glshader->converted);
+            
+            // patch OptiFine 1.17.x
+            if (FindString(glshader->converted, "\nuniform mat4 textureMatrix = mat4(1.0);")) {
+                InplaceReplace(glshader->converted, &convertedLen, "\nuniform mat4 textureMatrix = mat4(1.0);", "\n#define textureMatrix mat4(1.0)");
+            }
+            
+            // some needed exts
+            const char* GL_EXT_blend_func_extended = "#extension GL_EXT_blend_func_extended : enable\n";
+            glshader->converted = InplaceInsert(GetLine(glshader->converted, 1), GL_EXT_blend_func_extended, glshader->converted, &convertedLen);
+        } else {
+
         // adapt shader if needed (i.e. not an es2 context and shader is not #version 100)
         if(glstate->glsl->es2 && !strncmp(glshader->source, "#version 100", 12))
             glshader->converted = strdup(glshader->source);
         else
             glshader->converted = ConvertShader(glshader->source, glshader->type==GL_VERTEX_SHADER?1:0, &glshader->need);
+        }
         // send source to GLES2 hardware if any
         host_functions.glShaderSource(shader, 1, (const GLchar * const*)((glshader->converted)?(&glshader->converted):(&glshader->source)), NULL);
         errorGL();
@@ -380,6 +439,7 @@ void APIENTRY_GL4ES gl4es_glReleaseShaderCompiler(void) {
 
 // ========== GL_ARB_shader_objects ==============
 
+AliasExport(void,glBindFragDataLocation,,(GLuint program, GLuint colorNumber, const char * name));
 AliasExport(GLuint,glCreateShader,,(GLenum shaderType));
 AliasExport(void,glDeleteShader,,(GLuint shader));
 AliasExport(void,glCompileShader,,(GLuint shader));
