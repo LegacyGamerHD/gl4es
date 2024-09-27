@@ -3,6 +3,7 @@
 //----------------------------------------------------------------------------
 #include <stdio.h>
 #include "init.h"
+#include "attributes.h"
 //----------------------------------------------------------------------------
 void LogPrintf_NoPrefix(const char *fmt,...);
 void LogFPrintf(FILE *fp,const char *fmt,...);

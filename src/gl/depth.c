@@ -1,10 +1,11 @@
+#include "host.h"
 #include "depth.h"
 
 #include "gl4es.h"
 #include "glstate.h"
 #include "loader.h"
 
-void gl4es_glDepthFunc(GLenum func) {
+void APIENTRY_GL4ES gl4es_glDepthFunc(GLenum func) {
     if(glstate->list.compiling) {
         PUSH_IF_COMPILING(glDepthFunc);
     }
@@ -13,12 +14,12 @@ void gl4es_glDepthFunc(GLenum func) {
         return;
     FLUSH_BEGINEND;
     glstate->depth.func = func;
-    LOAD_GLES(glDepthFunc);
+    
     errorGL();
-    gles_glDepthFunc(func);
+    host_functions.glDepthFunc(func);
 }
 
-void gl4es_glDepthMask(GLboolean flag) {
+void APIENTRY_GL4ES gl4es_glDepthMask(GLboolean flag) {
     if(glstate->list.compiling) {
         PUSH_IF_COMPILING(glDepthMask);
     }
@@ -27,45 +28,46 @@ void gl4es_glDepthMask(GLboolean flag) {
         return;
     FLUSH_BEGINEND;
     glstate->depth.mask = flag;
-    LOAD_GLES(glDepthMask);
+    
     errorGL();
-    gles_glDepthMask(flag);
+    host_functions.glDepthMask(flag);
 }
 
 GLfloat clamp(GLfloat a) {
     return (a<0.f)?0.f:((a>1.f)?1.f:a);
 }
 
-void gl4es_glDepthRangef(GLclampf near, GLclampf far) {
-    near = clamp(near);
-    far = clamp(far);
+void APIENTRY_GL4ES gl4es_glDepthRangef(GLclampf Near, GLclampf Far) {
+    Near = clamp(Near);
+    Far = clamp(Far);
     if(glstate->list.compiling) {
         PUSH_IF_COMPILING(glDepthRangef);
     }
     noerrorShim();
-    if ((glstate->depth.near == near) && (glstate->depth.far == far))
+    if ((glstate->depth.Near == Near) && (glstate->depth.Far == Far))
         return;
     FLUSH_BEGINEND;
-    glstate->depth.near = near;
-    glstate->depth.far = far;
-    LOAD_GLES(glDepthRangef);
+    glstate->depth.Near = Near;
+    glstate->depth.Far = Far;
+    
     errorGL();
-    gles_glDepthRangef(near, far);
+    host_functions.glDepthRangef(Near, Far);
 }
 
-void gl4es_glClearDepthf(GLclampf depth) {
+void APIENTRY_GL4ES gl4es_glClearDepthf(GLclampf depth) {
     depth = clamp(depth);
     if(glstate->list.compiling) {
         PUSH_IF_COMPILING(glClearDepthf);
     }
     noerrorShim();
     glstate->depth.clear = depth;
-    LOAD_GLES(glClearDepthf);
+    
     errorGL();
-    gles_glClearDepthf(depth);
+    host_functions.glClearDepthf(depth);
 }
 
-void glDepthFunc(GLenum func) AliasExport("gl4es_glDepthFunc");
-void glDepthMask(GLboolean flag) AliasExport("gl4es_glDepthMask");
-void glDepthRangef(GLclampf nearVal, GLclampf farVal) AliasExport("gl4es_glDepthRangef");
+AliasExport(void,glDepthFunc,,(GLenum func));
+AliasExport(void,glDepthMask,,(GLboolean flag));
+AliasExport(void,glDepthRangef,,(GLclampf nearVal, GLclampf farVal));
+AliasExport(void,glClearDepthf,,(GLclampf depth));
 

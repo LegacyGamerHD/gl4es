@@ -1,6 +1,7 @@
+#include "host.h"
 #include "loader.h"
 
-void (*gl4es_getMainFBSize)(GLint* width, GLint* height);
+void (APIENTRY_GL4ES *gl4es_getMainFBSize)(GLint* width, GLint* height);
 
 #if defined NO_LOADER
 
@@ -25,17 +26,23 @@ void *open_lib(const char **names, const char *override) {
 
 
 #else
+#ifndef _WIN32
 // PATH_MAX
 #ifdef __linux__
 #include <linux/limits.h>
 #else
 #include <limits.h>
 #endif
+#else
+__declspec(dllimport)
+struct HINSTANCE__* __stdcall LoadLibraryW(const wchar_t*);
+#endif
 #include "logs.h"
 #include "init.h"
 #include "envvars.h"
 
 void *gles = NULL, *egl = NULL, *bcm_host = NULL, *vcos = NULL, *gbm = NULL, *drm = NULL;
+#ifndef _WIN32
 #ifndef NO_GBM
 static const char *drm_lib[] = {
     "libdrm",
@@ -69,19 +76,19 @@ static const char *lib_ext[] = {
 
 static const char *gles2_lib[] = {
     #if defined(BCMHOST)
-    "libbrcmGLESv2",
+    "libbrcmGLESv3",
     #endif
-    "libGLESv2_CM",
-    "libGLESv2",
+    "libGLESv3_CM",
+    "libGLESv3",
     NULL
 };
 
 static const char *gles_lib[] = {
     #if defined(BCMHOST)
-    "libbrcmGLESv1_CM",
+    "libbrcmGLESv3",
     #endif
-    "libGLESv1_CM",
-    "libGLES_CM",
+    "libGLESv3_CM",
+    "libGLESv3",
     NULL
 };
 
@@ -98,9 +105,18 @@ void *open_lib(const char **names, const char *override) {
 
     char path_name[PATH_MAX + 1];
     int flags = RTLD_LOCAL | RTLD_NOW;
-#if defined(RTLD_DEEPBIND) && !defined(PYRA)
+#if defined(RTLD_DEEPBIND)
+    static int totest = 1;
+    static int sanitizer = 0;
+    if(totest) {
+        totest = 0;
+        char *p = getenv("LD_PRELOAD");
+        if(p && strstr(p, "libasan.so"))
+            sanitizer = 1;
+    }
     // note: breaks address sanitizer
-    flags |= RTLD_DEEPBIND;
+    if(!sanitizer && globals4es.deepbind)
+        flags |= RTLD_DEEPBIND;
 #endif
     if (override) {
         if ((lib = dlopen(override, flags))) {
@@ -124,11 +140,19 @@ void *open_lib(const char **names, const char *override) {
     }
     return lib;
 }
+#else  // _WIN32
+void* open_lib(const wchar_t* envvar, const wchar_t* dll)
+{
+    const wchar_t* name = _wgetenv(envvar);
+    return LoadLibraryW(name?name:dll);
+}
+#endif
 
 void load_libs() {
     static int first = 1;
     if (! first) return;
     first = 0;
+#ifndef _WIN32
     const char *gles_override = GetEnvVar("LIBGL_GLES");
 #if defined(BCMHOST) && !defined(ANDROID)
     // optimistically try to load the raspberry pi libs
@@ -140,13 +164,18 @@ void load_libs() {
     }
 #endif
     gles = open_lib((globals4es.es==1)?gles_lib:gles2_lib, gles_override);
+#else
+    gles = open_lib(L"LIBGL_GLES", L"libGLESv2.dll");
+#endif
     WARN_NULL(gles);
 
 #ifdef NOEGL
     egl = gles;
-#else
+#elif !defined(_WIN32)
     const char *egl_override = GetEnvVar("LIBGL_EGL");
     egl = open_lib(egl_lib, egl_override);
+#else
+    egl = open_lib(L"LIBGL_EGL", L"libEGL.dll");
 #endif
     WARN_NULL(egl);
 
@@ -156,13 +185,14 @@ void load_libs() {
     const char *drm_override = GetEnvVar("LIBGL_DRM");
     drm = open_lib(drm_lib, drm_override);
 #endif
+    init_gl_functions();
 }
 #endif
 
 // user-defined getProcAddress
-void *(*gles_getProcAddress)(const char *name);
+void* (APIENTRY_GL4ES *gles_getProcAddress)(const char *name);
 
-void *proc_address(void *lib, const char *name) {
+void* APIENTRY_GL4ES proc_address(void *lib, const char *name) {
     if (gles_getProcAddress)
         return gles_getProcAddress(name);
 #ifdef AMIGAOS4

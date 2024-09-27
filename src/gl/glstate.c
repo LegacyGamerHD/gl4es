@@ -1,3 +1,4 @@
+#include "host.h"
 #include "glstate.h"
 
 #include "../glx/hardext.h"
@@ -19,35 +20,35 @@ void init_matrix(glstate_t* glstate);
 
 static void free_renderbuffer(glrenderbuffer_t *rend)
 {
-    LOAD_GLES2_OR_OES(glDeleteRenderbuffers);
-    if(!rend || !gles_glDeleteRenderbuffers)
+    
+    if(!rend || !host_functions.glDeleteRenderbuffers)
         return;
     if(rend->secondarybuffer)
-        gles_glDeleteRenderbuffers(1, &rend->secondarybuffer);
+        host_functions.glDeleteRenderbuffers(1, &rend->secondarybuffer);
     if(rend->renderbuffer)
-        gles_glDeleteRenderbuffers(1, &rend->renderbuffer);
+        host_functions.glDeleteRenderbuffers(1, &rend->renderbuffer);
     // the texture will be free by the free of the texture list, as it's referenced there...
     free(rend);
 }
 
 static void free_framebuffer(glframebuffer_t *fb)
 {
-    LOAD_GLES2_OR_OES(glDeleteFramebuffers);
-    if(!fb || !gles_glDeleteFramebuffers)
+    
+    if(!fb || !host_functions.glDeleteFramebuffers)
         return;
     if(fb->id)
-        gles_glDeleteFramebuffers(1, &fb->id);
+        host_functions.glDeleteFramebuffers(1, &fb->id);
     // the texture will be free by the free of the texture list, as it's referenced there...
     free(fb);
 }
 
 static void free_texture(gltexture_t *tex)
 {
-    LOAD_GLES(glDeleteTextures);
-    if(!tex || !gles_glDeleteTextures)
+    
+    if(!tex || !host_functions.glDeleteTextures)
         return;
     if(tex->glname)
-        gles_glDeleteTextures(1, &tex->glname);
+        host_functions.glDeleteTextures(1, &tex->glname);
     if(tex->data)
         free(tex->data);
     // renderbuffer linked to this texture will be freed by the free_renderbuffer function.
@@ -84,13 +85,14 @@ void* NewGLState(void* shared_glstate, int es2only) {
         glstate->glsl = copy_state->glsl;
         //glstate->gleshard = copy_state->gleshard; // Not shared (at least not the VA)
         glstate->buffers = copy_state->buffers;
-        glstate->queries = copy_state->queries;
         glstate->fpe_cache = copy_state->fpe_cache;
         glstate->fbo.renderbufferlist = copy_state->fbo.renderbufferlist;
         glstate->fbo.default_rb = copy_state->fbo.default_rb;
         glstate->fbo.framebufferlist = copy_state->fbo.framebufferlist;
         glstate->fbo.fbo_0 = copy_state->fbo.fbo_0;
         glstate->fbo.old = copy_state->fbo.old;
+        glstate->samplers.samplerlist = copy_state->samplers.samplerlist;
+        glstate->queries.querylist = copy_state->queries.querylist;
 
         glstate->defaultvbo = copy_state->defaultvbo;
     }
@@ -107,9 +109,9 @@ void* NewGLState(void* shared_glstate, int es2only) {
     for (int i=0; i<MAX_TEX; ++i)
         glstate->texcoord[i] = glstate->vavalue[ATT_MULTITEXCOORD0+i];
     // set specifics default
-	GLfloat white[] = {1.0f, 1.0f, 1.0f, 1.0f};
-	memcpy(glstate->color, white, sizeof(GLfloat)*4);
-	glstate->last_error = GL_NO_ERROR;
+    GLfloat white[] = {1.0f, 1.0f, 1.0f, 1.0f};
+    memcpy(glstate->color, white, sizeof(GLfloat)*4);
+    glstate->shim_error = GL_NO_ERROR;
     glstate->normal[2] = 1.0f; // default normal is 0/0/1
     glstate->matrix_mode = GL_MODELVIEW;
     
@@ -236,9 +238,7 @@ void* NewGLState(void* shared_glstate, int es2only) {
         tex->base_level = -1;
         tex->max_level = -1;
         tex->alpha = true;
-        tex->min_filter = (globals4es.automipmap==1)?GL_LINEAR_MIPMAP_LINEAR:GL_LINEAR;
-        tex->mag_filter = GL_LINEAR;
-        tex->wrap_s = tex->wrap_t = GL_REPEAT;
+        init_sampler(&tex->sampler);
         tex->fpe_format = FPE_TEX_RGBA;
         tex->format = GL_RGBA;
         tex->type = GL_UNSIGNED_BYTE;
@@ -296,14 +296,14 @@ void* NewGLState(void* shared_glstate, int es2only) {
     // Depth
     glstate->depth.func = GL_LESS;
     glstate->depth.mask = GL_TRUE;
-    glstate->depth.far  = 1.0f;
+    glstate->depth.Far  = 1.0f;
     glstate->depth.clear= 1.0f;
     // Face
     glstate->face.cull  = GL_BACK;
     glstate->face.front = GL_CCW;
     // Point Sprite
     glstate->pointsprite.size = 1.0f;
-    glstate->pointsprite.sizeMax = 32.0f;   // spec indicate 1., but it seems it's set to hardware limit, so puting 32...
+    glstate->pointsprite.sizeMax = 32.0f;   // spec indicate 1., but it seems it's set to hardware limit, so putting 32...
     glstate->pointsprite.fadeThresholdSize = 1.0f;
     glstate->pointsprite.distance[0] = 1.0f;
     glstate->pointsprite.coordOrigin = GL_UPPER_LEFT;
@@ -356,13 +356,19 @@ void* NewGLState(void* shared_glstate, int es2only) {
         // some default are not 0...
         for (int i=0; i<MAX_TEX; i++) {
             //TexEnv Combine that are not 0
+            glstate->fpe_state->texenv[i].texsrcrgb0 = FPE_SRC_TEXTURE;
+            glstate->fpe_state->texenv[i].texsrcalpha0 = FPE_SRC_TEXTURE;
             glstate->fpe_state->texenv[i].texsrcrgb1 = FPE_SRC_PREVIOUS;
             glstate->fpe_state->texenv[i].texsrcalpha1 = FPE_SRC_PREVIOUS;
             glstate->fpe_state->texenv[i].texsrcrgb2 = FPE_SRC_CONSTANT;
             glstate->fpe_state->texenv[i].texsrcalpha2 = FPE_SRC_CONSTANT;
             glstate->fpe_state->texenv[i].texoprgb0 = FPE_OP_SRCCOLOR;
             glstate->fpe_state->texenv[i].texoprgb1 = FPE_OP_SRCCOLOR;
-        }            
+        }
+        if(globals4es.shaderblend) {
+            glstate->fpe_state->blendsrcrgb = FPE_BLEND_ONE;
+            glstate->fpe_state->blendsrcalpha = FPE_BLEND_ONE;
+        }
     }
 
     // GLSL stuff
@@ -382,9 +388,9 @@ void* NewGLState(void* shared_glstate, int es2only) {
 #if defined(AMIGAOS4) || defined(__EMSCRIPTEN__)
     if(!def) {// if it's default_glstate, then there is probably no glcontext...
 #endif
-    LOAD_GLES(glGetIntegerv);
-    gles_glGetIntegerv(GL_VIEWPORT, (GLint*)&glstate->raster.viewport);
-    gles_glGetIntegerv(GL_SCISSOR_BOX, (GLint*)&glstate->raster.scissor);
+    
+    host_functions.glGetIntegerv(GL_VIEWPORT, (GLint*)&glstate->raster.viewport);
+    host_functions.glGetIntegerv(GL_SCISSOR_BOX, (GLint*)&glstate->raster.scissor);
 #if defined(AMIGAOS4) || defined(__EMSCRIPTEN__)
     }
 #endif
@@ -422,16 +428,23 @@ void* NewGLState(void* shared_glstate, int es2only) {
     glstate->fbo.current_rb = glstate->fbo.default_rb;
     glstate->fbo.fbo_read = glstate->fbo.fbo_0;
     glstate->fbo.fbo_draw = glstate->fbo.fbo_0;
+    // Samplers & queries
+    if(!shared_glstate)
+    {
+        glstate->samplers.samplerlist = kh_init(samplerlist_t);
+        glstate->queries.querylist = kh_init(queries);
+    }
+    glstate->queries.start = get_clock();
     // Get the per/context hardware values
     glstate->readf = GL_RGBA;
     glstate->readt = GL_UNSIGNED_BYTE;
 #if defined(AMIGAOS4) || defined(__EMSCRIPTEN__)
     if(!def) // if it's default_glstate, then there is probably no glcontext...
     {
-    LOAD_GLES(glGetIntegerv);
+    
 #endif
-    gles_glGetIntegerv(GL_IMPLEMENTATION_COLOR_READ_FORMAT_OES, &glstate->readf);
-    gles_glGetIntegerv(GL_IMPLEMENTATION_COLOR_READ_TYPE_OES, &glstate->readt);
+    host_functions.glGetIntegerv(GL_IMPLEMENTATION_COLOR_READ_FORMAT_OES, (GLint *) &glstate->readf);
+    host_functions.glGetIntegerv(GL_IMPLEMENTATION_COLOR_READ_TYPE_OES, (GLint *) &glstate->readt);
 #if defined(AMIGAOS4) || defined(__EMSCRIPTEN__)
     }
 #endif
@@ -475,12 +488,13 @@ void DeleteGLState(void* oldstate) {
     }
     free_hashmap(glvao_t, vaos, glvao, free);
     if(!state->shared_cnt) {
-        free_hashmap(glquery_t, queries, queries, free);
         free_hashmap(glbuffer_t, buffers, buff, free);
         free_hashmap(gltexture_t, texture.list, tex, free_texture);
         free_hashmap(renderlist_t, headlists, gllisthead, free_renderlist);
         free_hashmap(glrenderbuffer_t, fbo.renderbufferlist, renderbufferlist_t, free_renderbuffer);
         free_hashmap(glframebuffer_t, fbo.framebufferlist, framebufferlist_t, free_framebuffer);
+        free_hashmap(glsampler_t, samplers.samplerlist, samplerlist_t, free);
+        free_hashmap(glquery_t, queries.querylist, queries, free);
     }
     #undef free_hashmap
     // free texture zero as it's not in the list anymore
@@ -546,8 +560,8 @@ void DeleteGLState(void* oldstate) {
     }
     // oldfbos
     if(!state->shared_cnt && state->fbo.old) {
-        LOAD_GLES2_OR_OES(glDeleteFramebuffers);
-        gles_glDeleteFramebuffers(state->fbo.old->nbr, state->fbo.old->fbos);
+        
+        host_functions.glDeleteFramebuffers(state->fbo.old->nbr, state->fbo.old->fbos);
         free(state->fbo.old->fbos);
         free(state->fbo.old);
     }
@@ -598,9 +612,9 @@ void ActivateGLState(void* new_glstate) {
     if(glstate || newstate!=&default_glstate) // avoid getting gles info with no context
 #endif
     if(new_glstate && (newstate->raster.viewport.width==0 || newstate->raster.viewport.height==0)) {
-        LOAD_GLES(glGetIntegerv);
-        gles_glGetIntegerv(GL_VIEWPORT, (GLint*)&newstate->raster.viewport);
-        gles_glGetIntegerv(GL_SCISSOR_BOX, (GLint*)&newstate->raster.scissor);
+        
+        host_functions.glGetIntegerv(GL_VIEWPORT, (GLint*)&newstate->raster.viewport);
+        host_functions.glGetIntegerv(GL_SCISSOR_BOX, (GLint*)&newstate->raster.scissor);
     }
     glstate = newstate;
 }

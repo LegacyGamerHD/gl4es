@@ -1,3 +1,4 @@
+#include "host.h"
 #include "debug.h"
 
 #include <string.h>
@@ -118,8 +119,13 @@ const char* PrintEnum(GLenum what) {
         p(GL_MAX_TEXTURE_COORDS);
         // texture pack/unpack
         p(GL_UNPACK_ALIGNMENT);
-        p(GL_PACK_ALIGNMENT);
         p(GL_UNPACK_ROW_LENGTH);
+        p(GL_UNPACK_SKIP_PIXELS);
+        p(GL_UNPACK_SKIP_ROWS);
+        p(GL_PACK_ALIGNMENT);
+        p(GL_PACK_ROW_LENGTH);
+        p(GL_PACK_SKIP_PIXELS);
+        p(GL_PACK_SKIP_ROWS);
         // framebuffer
         p(GL_COLOR_ATTACHMENT0);
         p(GL_COLOR_ATTACHMENT1);
@@ -415,8 +421,8 @@ const char* PrintEGLError(int onlyerror) {
 }
 
 void CheckGLError(int fwd) {
-    LOAD_GLES(glGetError);
-    GLenum err=gles_glGetError();
+    
+    GLenum err=host_functions.glGetError();
     if(err!=GL_NO_ERROR) {
         printf("LIBGL: glGetError(): %s\n", PrintEnum(err));
         if(fwd)

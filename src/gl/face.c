@@ -1,10 +1,11 @@
+#include "host.h"
 #include "face.h"
 
 #include "loader.h"
 #include "gl4es.h"
 #include "glstate.h"
 
-void gl4es_glCullFace(GLenum mode) {
+void APIENTRY_GL4ES gl4es_glCullFace(GLenum mode) {
     if(!glstate->list.pending)
         PUSH_IF_COMPILING(glCullFace);
     if(mode!=GL_FRONT && mode!=GL_BACK && mode!=GL_FRONT_AND_BACK) {
@@ -18,11 +19,11 @@ void gl4es_glCullFace(GLenum mode) {
     FLUSH_BEGINEND;
     
     glstate->face.cull = mode;
-    LOAD_GLES(glCullFace);
-    gles_glCullFace(mode);
+    
+    host_functions.glCullFace(mode);
 }
 
-void gl4es_glFrontFace(GLenum mode) {
+void APIENTRY_GL4ES gl4es_glFrontFace(GLenum mode) {
     if(!glstate->list.pending)
         PUSH_IF_COMPILING(glFrontFace);
     if(mode!=GL_CW && mode!=GL_CCW) {
@@ -36,10 +37,10 @@ void gl4es_glFrontFace(GLenum mode) {
     FLUSH_BEGINEND;
     
     glstate->face.front = mode;
-    LOAD_GLES(glFrontFace);
-    gles_glFrontFace(mode);
+    
+    host_functions.glFrontFace(mode);
 }
 
 
-void glCullFace(GLenum mode) AliasExport("gl4es_glCullFace");
-void glFrontFace(GLenum mode) AliasExport("gl4es_glFrontFace");
+AliasExport(void,glCullFace,,(GLenum mode));
+AliasExport(void,glFrontFace,,(GLenum mode));
