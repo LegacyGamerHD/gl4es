@@ -755,11 +755,11 @@ void draw_renderlist(renderlist_t *list) {
                     int vbo_indices = 0;
                     if(!use_vbo_indices) {
                         // create VBO for indices
-                        LOAD_GLES2(glGenBuffers);
-                        LOAD_GLES2(glBufferData);
-                        gles_glGenBuffers(1, &list->vbo_indices);
-                        gles_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, list->vbo_indices);
-                        gles_glBufferData(GL_ELEMENT_ARRAY_BUFFER, list->ilen*sizeof(GLushort), indices, GL_STATIC_DRAW);
+                        
+                        
+                        host_functions.glGenBuffers(1, &list->vbo_indices);
+                        bindBuffer(GL_ELEMENT_ARRAY_BUFFER, list->vbo_indices);
+                        host_functions.glBufferData(GL_ELEMENT_ARRAY_BUFFER, list->ilen*sizeof(GLushort), indices, GL_STATIC_DRAW);
                         use_vbo_indices = 2;
                         vbo_indices = 1;
                     } else if(use_vbo_indices==2) {
