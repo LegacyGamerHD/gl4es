@@ -287,6 +287,7 @@ static const char* GLESHeader[] = {
   "#version 120\n%sprecision %s float;\nprecision %s int;\n",
   "#version 310 es\n%sprecision %s float;\nprecision %s int;\n",
   "#version 300 es\n%sprecision %s float;\nprecision %s int;\n"
+  "#version 320 es\n%sprecision %s float;\nprecision %s int;\n"
 };
 
 static const char* gl4es_transpose =
@@ -502,6 +503,7 @@ char* ConvertShader(const char* pEntry, int isVertex, shaderconv_need_t *need)
      version120 = 1;
   if(version120) {
     if(hardext.glsl120) versionHeader = 1;
+    else if(hardext.glsl320es) versionHeader = 4;
     else if(hardext.glsl310es) versionHeader = 2;
     else if(hardext.glsl300es) { versionHeader = 3; /* location on uniform not supported ! */ }
     /* else no location or in / out are supported */
@@ -1261,6 +1263,9 @@ char* ConvertShader(const char* pEntry, int isVertex, shaderconv_need_t *need)
   
   if (versionHeader > 1) {
     const char* GLESBackport = "#define texture2D texture\n#define attribute in\n#define varying out\n";
+    Tmp = gl4es_inplace_insert(gl4es_getline(Tmp, 1), GLESBackport, Tmp, &tmpsize);
+  }else {
+      const char* GLESForwardPort = "#define texture texture2D\n #define textureProj texture2DProj\n #define mod(a,b) (int(a) - int(b) * int(a/b))\n";
     Tmp = gl4es_inplace_insert(gl4es_getline(Tmp, 1), GLESBackport, Tmp, &tmpsize);
   }
 
