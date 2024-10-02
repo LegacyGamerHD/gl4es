@@ -4,8 +4,7 @@
 #include "gles.h"
 #include "program.h"
 
-char * ConvertShaderConditionally(struct shader_s * shader_source);
-char* ConvertShader(const char* pBuffer, int isVertex, shaderconv_need_t *need, int forwardPort);
+char* ConvertShader(const char* pBuffer, int isVertex, shaderconv_need_t *need);
 
 int isBuiltinAttrib(const char* name);
 int isBuiltinMatrix(const char* name);
