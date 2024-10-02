@@ -1,4 +1,4 @@
-#include "host.h"
+
 #include "list.h"
 
 #include "../glx/hardext.h"
@@ -23,9 +23,10 @@ typedef struct array2vbo_s {
 
 int list2VBO(renderlist_t* list)
 {
-    
-    
-    
+    LOAD_GLES2(glGenBuffers);
+    LOAD_GLES2(glBindBuffer);
+    LOAD_GLES2(glBufferData);
+    LOAD_GLES2(glBufferSubData);
     array2vbo_t work[ATT_MAX] = {0};
     // list -> work
     int imax = 0;
@@ -108,14 +109,15 @@ int list2VBO(renderlist_t* list)
     if(!vbo_base)   // no data?!
         return 1;
     // Create the VBO and fill the data
-    host_functions.glGenBuffers(1, &list->vbo_array);
-    bindBuffer(GL_ARRAY_BUFFER, list->vbo_array);
-    host_functions.glBufferData(GL_ARRAY_BUFFER, vbo_base, NULL, GL_STATIC_DRAW);
+    gles_glGenBuffers(1, &list->vbo_array);
+    gles_glBindBuffer(GL_ARRAY_BUFFER, list->vbo_array);
+    gles_glBufferData(GL_ARRAY_BUFFER, vbo_base, NULL, GL_STATIC_DRAW);
     for(int i=0; i<imax; ++i) {
         array2vbo_t *r = work+sorted[i];
         if(r->vbo_base==r->vbo_basebase)
-            host_functions.glBufferSubData(GL_ARRAY_BUFFER, r->vbo_basebase, r->real_size, (void*)r->real_base);
+            gles_glBufferSubData(GL_ARRAY_BUFFER, r->vbo_basebase, r->real_size, (void*)r->real_base);
     }
+    gles_glBindBuffer(GL_ARRAY_BUFFER, 0);
     // work -> list
     imax = 0;
     if(list->vert) {
@@ -150,58 +152,45 @@ int list2VBO(renderlist_t* list)
 typedef struct save_vbo_s {
     GLuint          real_buffer;
     const GLvoid*   real_pointer;
-    glbuffer_t*     buffer;
 } save_vbo_t;
 
 void listActiveVBO(renderlist_t* list, save_vbo_t* saved) {
     if(list->vert) {
         saved[ATT_VERTEX].real_buffer = glstate->vao->vertexattrib[ATT_VERTEX].real_buffer;
         saved[ATT_VERTEX].real_pointer = glstate->vao->vertexattrib[ATT_VERTEX].real_pointer;
-        saved[ATT_VERTEX].buffer = glstate->vao->vertexattrib[ATT_VERTEX].buffer;
         glstate->vao->vertexattrib[ATT_VERTEX].real_buffer = list->vbo_array;
         glstate->vao->vertexattrib[ATT_VERTEX].real_pointer = list->vbo_vert;
-        glstate->vao->vertexattrib[ATT_VERTEX].buffer = NULL;
     }
     if(list->color) {
         saved[ATT_COLOR].real_buffer = glstate->vao->vertexattrib[ATT_COLOR].real_buffer;
         saved[ATT_COLOR].real_pointer = glstate->vao->vertexattrib[ATT_COLOR].real_pointer;
-        saved[ATT_COLOR].buffer = glstate->vao->vertexattrib[ATT_COLOR].buffer;
         glstate->vao->vertexattrib[ATT_COLOR].real_buffer = list->vbo_array;
         glstate->vao->vertexattrib[ATT_COLOR].real_pointer = list->vbo_color;
-        glstate->vao->vertexattrib[ATT_COLOR].buffer = NULL;
     }
     if(list->secondary) {
         saved[ATT_SECONDARY].real_buffer = glstate->vao->vertexattrib[ATT_SECONDARY].real_buffer;
         saved[ATT_SECONDARY].real_pointer = glstate->vao->vertexattrib[ATT_SECONDARY].real_pointer;
-        saved[ATT_SECONDARY].buffer = glstate->vao->vertexattrib[ATT_SECONDARY].buffer;
         glstate->vao->vertexattrib[ATT_SECONDARY].real_buffer = list->vbo_array;
         glstate->vao->vertexattrib[ATT_SECONDARY].real_pointer = list->vbo_secondary;
-        glstate->vao->vertexattrib[ATT_SECONDARY].buffer = NULL;
     }
     if(list->fogcoord) {
         saved[ATT_FOGCOORD].real_buffer = glstate->vao->vertexattrib[ATT_FOGCOORD].real_buffer;
         saved[ATT_FOGCOORD].real_pointer = glstate->vao->vertexattrib[ATT_FOGCOORD].real_pointer;
-        saved[ATT_FOGCOORD].buffer = glstate->vao->vertexattrib[ATT_FOGCOORD].buffer;
         glstate->vao->vertexattrib[ATT_FOGCOORD].real_buffer = list->vbo_array;
         glstate->vao->vertexattrib[ATT_FOGCOORD].real_pointer = list->vbo_fogcoord;
-        glstate->vao->vertexattrib[ATT_FOGCOORD].buffer = NULL;
     }
     if(list->normal) {
         saved[ATT_NORMAL].real_buffer = glstate->vao->vertexattrib[ATT_NORMAL].real_buffer;
         saved[ATT_NORMAL].real_pointer = glstate->vao->vertexattrib[ATT_NORMAL].real_pointer;
-        saved[ATT_NORMAL].buffer = glstate->vao->vertexattrib[ATT_NORMAL].buffer;
         glstate->vao->vertexattrib[ATT_NORMAL].real_buffer = list->vbo_array;
         glstate->vao->vertexattrib[ATT_NORMAL].real_pointer = list->vbo_normal;
-        glstate->vao->vertexattrib[ATT_NORMAL].buffer = NULL;
     }
     for (int a=0; a<list->maxtex; ++a) {
         if(list->tex[a]) {
             saved[ATT_MULTITEXCOORD0+a].real_buffer = glstate->vao->vertexattrib[ATT_MULTITEXCOORD0+a].real_buffer;
             saved[ATT_MULTITEXCOORD0+a].real_pointer = glstate->vao->vertexattrib[ATT_MULTITEXCOORD0+a].real_pointer;
-            saved[ATT_MULTITEXCOORD0+a].buffer = glstate->vao->vertexattrib[ATT_MULTITEXCOORD0+a].buffer;
             glstate->vao->vertexattrib[ATT_MULTITEXCOORD0+a].real_buffer = list->vbo_array;
             glstate->vao->vertexattrib[ATT_MULTITEXCOORD0+a].real_pointer = list->vbo_tex[a];
-            glstate->vao->vertexattrib[ATT_MULTITEXCOORD0+a].buffer = NULL;
         }
     }
 }
@@ -209,33 +198,27 @@ void listInactiveVBO(renderlist_t* list, save_vbo_t* saved) {
     if(list->vert) {
         glstate->vao->vertexattrib[ATT_VERTEX].real_buffer = saved[ATT_VERTEX].real_buffer;
         glstate->vao->vertexattrib[ATT_VERTEX].real_pointer = saved[ATT_VERTEX].real_pointer;
-        glstate->vao->vertexattrib[ATT_VERTEX].buffer = saved[ATT_VERTEX].buffer;
     }
     if(list->color) {
         glstate->vao->vertexattrib[ATT_COLOR].real_buffer = saved[ATT_COLOR].real_buffer;
         glstate->vao->vertexattrib[ATT_COLOR].real_pointer = saved[ATT_COLOR].real_pointer;
-        glstate->vao->vertexattrib[ATT_COLOR].buffer = saved[ATT_COLOR].buffer;
     }
     if(list->secondary) {
         glstate->vao->vertexattrib[ATT_SECONDARY].real_buffer = saved[ATT_SECONDARY].real_buffer;
         glstate->vao->vertexattrib[ATT_SECONDARY].real_pointer = saved[ATT_SECONDARY].real_pointer;
-        glstate->vao->vertexattrib[ATT_SECONDARY].buffer = saved[ATT_SECONDARY].buffer;
     }
     if(list->fogcoord) {
         glstate->vao->vertexattrib[ATT_FOGCOORD].real_buffer = saved[ATT_FOGCOORD].real_buffer;
         glstate->vao->vertexattrib[ATT_FOGCOORD].real_pointer = saved[ATT_FOGCOORD].real_pointer;
-        glstate->vao->vertexattrib[ATT_FOGCOORD].buffer = saved[ATT_FOGCOORD].buffer;
     }
     if(list->normal) {
         glstate->vao->vertexattrib[ATT_NORMAL].real_buffer = saved[ATT_NORMAL].real_buffer;
         glstate->vao->vertexattrib[ATT_NORMAL].real_pointer = saved[ATT_NORMAL].real_pointer;
-        glstate->vao->vertexattrib[ATT_NORMAL].buffer = saved[ATT_NORMAL].buffer;
     }
     for (int a=0; a<list->maxtex; ++a) {
         if(list->tex[a]) {
             glstate->vao->vertexattrib[ATT_MULTITEXCOORD0+a].real_buffer = saved[ATT_MULTITEXCOORD0+a].real_buffer;
             glstate->vao->vertexattrib[ATT_MULTITEXCOORD0+a].real_pointer = saved[ATT_MULTITEXCOORD0+a].real_pointer;
-            glstate->vao->vertexattrib[ATT_MULTITEXCOORD0+a].buffer = saved[ATT_MULTITEXCOORD0+a].buffer;
         }
     }
 }
@@ -366,14 +349,15 @@ void draw_renderlist(renderlist_t *list) {
     while (list->prev) list = list->prev;
     // ok, go on now, draw everything
 //printf("draw_renderlist %p, size=%i, mode=%s(%s), ilen=%d, next=%p, color=%p, secondarycolor=%p fogcoord=%p\n", list, list->len, PrintEnum(list->mode), PrintEnum(list->mode_init), list->ilen, list->next, list->color, list->secondary, list->fogcoord);
-    
-    
-    
-    
-    
-    
-    
-    
+    LOAD_GLES_FPE(glDrawArrays);
+    LOAD_GLES_FPE(glDrawElements);
+    LOAD_GLES_FPE(glVertexPointer);
+    LOAD_GLES_FPE(glNormalPointer);
+    LOAD_GLES_FPE(glColorPointer);
+    LOAD_GLES_FPE(glTexCoordPointer);
+    LOAD_GLES_FPE(glEnable);
+    LOAD_GLES_FPE(glDisable);
+    LOAD_GLES2(glBindBuffer);
     gl4es_glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT);
 
 	int old_tex;
@@ -382,6 +366,7 @@ void draw_renderlist(renderlist_t *list) {
     old_tex = glstate->texture.client;
     GLuint cur_tex = old_tex;
     GLint needclean[MAX_TEX] = {0};
+    GLuint texture;
     bool stipple;
     int stipple_tmu;
     GLenum stipple_env;
@@ -532,14 +517,14 @@ void draw_renderlist(renderlist_t *list) {
         }
         if (list->vert) {
             fpe_glEnableClientState(GL_VERTEX_ARRAY);
-            host_functions.fpe_glVertexPointer(4, GL_FLOAT, list->vert_stride, list->vert);
+            gles_glVertexPointer(4, GL_FLOAT, list->vert_stride, list->vert);
         } else {
             fpe_glDisableClientState(GL_VERTEX_ARRAY);
         }
 
         if (list->normal) {
             fpe_glEnableClientState(GL_NORMAL_ARRAY);
-            host_functions.fpe_glNormalPointer(GL_FLOAT, list->normal_stride, list->normal);
+            gles_glNormalPointer(GL_FLOAT, list->normal_stride, list->normal);
         } else {
             fpe_glDisableClientState(GL_NORMAL_ARRAY);
         }
@@ -564,10 +549,10 @@ void draw_renderlist(renderlist_t *list) {
                             list->final_colors[i]=list->color[i] + list->secondary[i];
                     }
                 }
-                host_functions.fpe_glColorPointer(4, GL_FLOAT, 0, list->final_colors);
+                gles_glColorPointer(4, GL_FLOAT, 0, list->final_colors);
             } else {
 //printf("colors=%f, %f, %f, %f / %f, %f, %f, %f\n", list->color[0],list->color[1],list->color[2],list->color[3], list->color[4],list->color[5],list->color[6],list->color[7]);
-                host_functions.fpe_glColorPointer(4, GL_FLOAT, list->color_stride, list->color);
+                gles_glColorPointer(4, GL_FLOAT, list->color_stride, list->color);
             }
         } else {
             fpe_glDisableClientState(GL_COLOR_ARRAY);
@@ -602,12 +587,12 @@ void draw_renderlist(renderlist_t *list) {
             if(!use_vbo_array) use_vbo_array = 1;
             stipple_old = glstate->gleshard->active;
             if(glstate->gleshard->active!=stipple_tmu) {
-                
+                LOAD_GLES(glActiveTexture);
                 gl4es_glActiveTexture(GL_TEXTURE0+stipple_tmu);
             }
             TEXTURE(stipple_tmu);
             GLenum matmode;
-            gl4es_glGetIntegerv(GL_MATRIX_MODE, (GLint *) &matmode);
+            gl4es_glGetIntegerv(GL_MATRIX_MODE, &matmode);
             gl4es_glMatrixMode(GL_TEXTURE);
             gl4es_glPushMatrix();
             gl4es_glLoadIdentity();
@@ -654,7 +639,7 @@ void draw_renderlist(renderlist_t *list) {
                             if(list->tex_stride[a]) {
                                 GLfloat *src = list->tex[a];
                                 GLfloat *dst = glstate->texgened[a];
-				int stride = list->tex_stride[a]>>2;    // stride need to be a multiple of 4 (i.e. sizeof(GLfloat))
+                                int stride = list->tex_stride[a]>>2;    // stride need to be a multiple of 4 (i.e. sizeof(GLfloat))
                                 for (int ii=0; ii<list->len; ii++) {
                                     memcpy(dst, src, 4*sizeof(GLfloat));
                                     src+=stride;
@@ -673,7 +658,7 @@ void draw_renderlist(renderlist_t *list) {
                 if ((list->tex[a] || (use_texgen[a] && !needclean[a]))/* && glstate->enable.texture[a]*/) {
                     TEXTURE(a);
                     fpe_glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-                    host_functions.fpe_glTexCoordPointer(4, GL_FLOAT, (use_texgen[a])?0:list->tex_stride[a], (use_texgen[a])?glstate->texgened[a]:list->tex[a]);
+                    gles_glTexCoordPointer(4, GL_FLOAT, (use_texgen[a])?0:list->tex_stride[a], (use_texgen[a])?glstate->texgened[a]:list->tex[a]);
                 } else {
                     if (glstate->gleshard->vertexattrib[ATT_MULTITEXCOORD0+a].enabled || (hardext.esversion!=1)) {   // optim for ES1.1 to avoid useless texture switch
                         TEXTURE(a);
@@ -686,7 +671,7 @@ void draw_renderlist(renderlist_t *list) {
                     TEXTURE(a);
                     gl4es_glActiveTexture(GL_TEXTURE0+a);
                     realize_active();
-                    host_functions.fpe_glEnable(GL_TEXTURE_2D);
+                    gles_glEnable(GL_TEXTURE_2D);
                 }
             }
         } else {
@@ -695,7 +680,7 @@ void draw_renderlist(renderlist_t *list) {
                 if(list->tex[a]) {
                     TEXTURE(a);
                     fpe_glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-                    host_functions.fpe_glTexCoordPointer(4, GL_FLOAT, list->tex_stride[a], list->tex[a]);
+                    gles_glTexCoordPointer(4, GL_FLOAT, list->tex_stride[a], list->tex[a]);
                 } else {
                     TEXTURE(a);
                     fpe_glDisableClientState(GL_TEXTURE_COORD_ARRAY);
@@ -739,7 +724,6 @@ void draw_renderlist(renderlist_t *list) {
                 select_glDrawElements(&vtx, list->mode, list->ilen, GL_UNSIGNED_SHORT, indices);
                 use_vbo_indices = 1;
             } else {
-                GLuint old_index = wantBufferIndex(0);
                 if (glstate->polygon_mode == GL_LINE && list->mode_init>=GL_TRIANGLES) {
                     int ilen = list->ilen;
                     if(!list->ind_lines) {
@@ -748,8 +732,7 @@ void draw_renderlist(renderlist_t *list) {
                         int k = fill_lineIndices(list->mode_inits?list->mode_inits:&tmp, list->mode_inits?list->mode_init_len:1, list->mode, indices, list->ind_lines);
                         list->ind_line = k;
                     }
-                    bindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-                    host_functions.fpe_glDrawElements(mode, list->ind_line, GL_UNSIGNED_SHORT, list->ind_lines);
+                    gles_glDrawElements(mode, list->ind_line, GL_UNSIGNED_SHORT, list->ind_lines);
                     use_vbo_indices = 1;
                 } else {
                     int vbo_indices = 0;
@@ -763,19 +746,19 @@ void draw_renderlist(renderlist_t *list) {
                         use_vbo_indices = 2;
                         vbo_indices = 1;
                     } else if(use_vbo_indices==2) {
-                        bindBuffer(GL_ELEMENT_ARRAY_BUFFER, list->vbo_indices);
+                        gles_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, list->vbo_indices);
                         vbo_indices = 1;
-                    } else
-                        realize_bufferIndex();
+                    }
                     if(list->instanceCount==1)
-                        host_functions.fpe_glDrawElements(mode, list->ilen, GL_UNSIGNED_SHORT, vbo_indices?NULL:indices);
+                        gles_glDrawElements(mode, list->ilen, GL_UNSIGNED_SHORT, vbo_indices?NULL:indices);
                     else {
                         for (glstate->instanceID=0; glstate->instanceID<list->instanceCount; ++glstate->instanceID)
-                            host_functions.fpe_glDrawElements(mode, list->ilen, GL_UNSIGNED_SHORT, vbo_indices?NULL:indices);
+                            gles_glDrawElements(mode, list->ilen, GL_UNSIGNED_SHORT, vbo_indices?NULL:indices);
                         glstate->instanceID = 0;
                     }
+                    if(vbo_indices)
+                        gles_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
                 }
-                wantBufferIndex(old_index);
             }
         } else {
             if (glstate->render_mode == GL_SELECT) {	
@@ -795,14 +778,13 @@ void draw_renderlist(renderlist_t *list) {
                         int k = fill_lineIndices(list->mode_inits?list->mode_inits:&tmp, list->mode_inits?list->mode_init_len:1, list->mode, NULL, list->ind_lines);
                         list->ind_line = k;
                     }
-                    bindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-					host_functions.fpe_glDrawElements(mode, list->ind_line, GL_UNSIGNED_SHORT, list->ind_lines);
+					gles_glDrawElements(mode, list->ind_line, GL_UNSIGNED_SHORT, list->ind_lines);
                 } else {
                     if(list->instanceCount==1)
-                        host_functions.fpe_glDrawArrays(mode, 0, len);
+                        gles_glDrawArrays(mode, 0, len);
                     else {
                         for (glstate->instanceID=0; glstate->instanceID<list->instanceCount; ++glstate->instanceID)
-                            host_functions.fpe_glDrawArrays(mode, 0, len);
+                            gles_glDrawArrays(mode, 0, len);
                         glstate->instanceID = 0;
                     }
                 }
@@ -822,7 +804,7 @@ void draw_renderlist(renderlist_t *list) {
                 }
                 if (!IS_TEX2D(glstate->enable.texture[a]) && (IS_ANYTEX(glstate->enable.texture[a]))) {
                     TEXTURE(a);
-                    host_functions.fpe_glDisable(GL_TEXTURE_2D);
+                    gles_glDisable(GL_TEXTURE_2D);
                 }
             }
         if (glstate->texture.client!=old_tex)
@@ -833,11 +815,11 @@ void draw_renderlist(renderlist_t *list) {
             if(!list->use_glstate)   //TODO: avoid that malloc/free...
                 free(list->tex[stipple_tmu]);
             list->tex[stipple_tmu]=NULL;
-            
+            LOAD_GLES(glActiveTexture);
             if(glstate->gleshard->active!=stipple_tmu)
                 gl4es_glActiveTexture(GL_TEXTURE0+stipple_tmu);
             GLenum matmode;
-            gl4es_glGetIntegerv(GL_MATRIX_MODE, (GLint *) &matmode);
+            gl4es_glGetIntegerv(GL_MATRIX_MODE, &matmode);
             gl4es_glMatrixMode(GL_TEXTURE);
             gl4es_glPopMatrix();
             gl4es_glMatrixMode(matmode);
