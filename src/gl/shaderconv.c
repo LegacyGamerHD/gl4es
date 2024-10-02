@@ -286,8 +286,7 @@ static const char* GLESHeader[] = {
   "#version 100\n%sprecision %s float;\nprecision %s int;\n",
   "#version 120\n%sprecision %s float;\nprecision %s int;\n",
   "#version 310 es\n%sprecision %s float;\nprecision %s int;\n",
-  "#version 300 es\n%sprecision %s float;\nprecision %s int;\n",
-  "#version 320 es\n%sprecision %s float;\nprecision %s int;\n"
+  "#version 300 es\n%sprecision %s float;\nprecision %s int;\n"
 };
 
 static const char* gl4es_transpose =
@@ -438,7 +437,7 @@ static const char* gl4es_VertexAttrib = "_gl4es_VertexAttrib_";
 char gl_VA[MAX_VATTRIB][32] = {0};
 char gl4es_VA[MAX_VATTRIB][32] = {0};
 
-char* ConvertShader(const char* pEntry, int isVertex, shaderconv_need_t *need, int forwardPort)
+char* ConvertShader(const char* pEntry, int isVertex, shaderconv_need_t *need)
 {
   #define ShadAppend(S) Tmp = gl4es_append(Tmp, &tmpsize, S)
 
@@ -493,12 +492,16 @@ char* ConvertShader(const char* pEntry, int isVertex, shaderconv_need_t *need, i
   int wanthighp = !fpeShader;
   if(wanthighp && !hardext.highp) wanthighp = 0;
   int versionHeader = 0;
-  SHUT_LOGD("version string: %s", versionString);
-  if(versionString && (strcmp(versionString, "120")==0 || strstr(versionString, "150") != NULL))
-     version120 = forwardPort ? 1 : 0;
+
+  #if 1
+  // support for higher glsl require much more work
+  // around some keyword
+  // like in/out that depends on the shader being vertex or fragment
+  // and a few other little things...
+  if(versionString && (strcmp(versionString, "120")==0 || strcmp(versionString, "150")==0))
+     version120 = 1;
   if(version120) {
     if(hardext.glsl120) versionHeader = 1;
-    else if(hardext.glsl320es) versionHeader = 4;
     else if(hardext.glsl310es) versionHeader = 2;
     else if(hardext.glsl300es) { versionHeader = 3; /* location on uniform not supported ! */ }
     /* else no location or in / out are supported */
@@ -721,7 +724,13 @@ char* ConvertShader(const char* pEntry, int isVertex, shaderconv_need_t *need, i
       // check for builtin OpenGL attributes...
       int n = sizeof(builtin_attrib)/sizeof(builtin_attrib_t);
       for (int i=0; i<n; i++) {
-          if(strstr(Tmp, builtin_attrib[i].glname)) {
+          char *Part_Tmp;
+          if((Part_Tmp = strstr(Tmp, builtin_attrib[i].glname))) {
+              if (!strcmp(builtin_attrib[i].glname, "gl_Vertex") && !strncmp(Part_Tmp, "gl_VertexID", 11)) {
+                  // attempt to recognize gl_VertexID as gl_Vertex?
+                  continue;
+              }
+              
               // ok, this attribute is used
               // replace gl_name by _gl4es_ one
               Tmp = gl4es_inplace_replace(Tmp, &tmpsize, builtin_attrib[i].glname, builtin_attrib[i].name);
@@ -1249,15 +1258,12 @@ char* ConvertShader(const char* pEntry, int isVertex, shaderconv_need_t *need, i
     // better to use #define ?
     Tmp = gl4es_inplace_replace(Tmp, &tmpsize, "mat3x3", "mat3");
   }
-
+  
   if (versionHeader > 1) {
     const char* GLESBackport = "#define texture2D texture\n#define attribute in\n#define varying out\n";
-    Tmp = InplaceInsert(GetLine(Tmp, 1), GLESBackport, Tmp, &tmpsize);
-  }else {
-      const char* GLESForwardPort = "#define texture texture2D\n #define textureProj texture2DProj\n #define mod(a,b) (int(a) - int(b) * int(a/b))\n";
-      Tmp = InplaceInsert(GetLine(Tmp, 1), GLESForwardPort, Tmp, &tmpsize);
+    Tmp = gl4es_inplace_insert(gl4es_getline(Tmp, 1), GLESBackport, Tmp, &tmpsize);
   }
-  
+
   // finish
   if((globals4es.dbgshaderconv&maskafter)==maskafter) {
     printf("New Shader source:\n%s\n", Tmp);
